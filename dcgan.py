@@ -13,6 +13,79 @@ from PIL import ImageTk, Image
 import argparse
 import math
 
+import tkinter as tk
+from tkinter import Label, Button
+import time
+
+
+
+class Application:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title('Real Time Latent Space Viewer')
+        self.latent_vector = np.zeros(shape=(1, 100))
+
+        self.panel = Label(self.root, text="Loading Image")
+        self.panel.pack(side="bottom", fill="both", expand="yes")
+
+        self.slider = tk.Scale(self.root, from_=-DIM_AMOUNT, to=DIM_AMOUNT,
+                               orient="horizontal")
+        self.slider.bind("<ButtonRelease-1>", self.updateValue)
+        self.slider.pack()
+
+        self.slider2 = tk.Scale(self.root, from_=-DIM_AMOUNT, to=DIM_AMOUNT,
+                               orient="horizontal")
+        self.slider2.bind("<ButtonRelease-1>", self.updateValue2)
+        self.slider2.pack()
+
+        self.inter_button = Button(self.root, text="Iterate")
+        self.inter_button.bind("<ButtonRelease-1>", self.iterate_dim)
+        self.start = -100
+        self.inter_button.pack()
+
+
+    def iterate_dim(self, event):
+        for index in range(-100,100):
+            num = index
+
+            print (self.latent_vector)
+            for i in range(self.latent_vector.shape[-1]):
+                if i == 0:
+                    self.latent_vector[:, i] = num
+            print (self.latent_vector)
+
+            img = generateImage(1, latent_vector=self.latent_vector)
+            self.panel.configure(image=img)
+            self.panel.image = img
+            self.root.update_idletasks()
+
+    def updateValue(self, event):
+        num = self.slider.get()
+
+        print (self.latent_vector)
+        for i in range(self.latent_vector.shape[-1]):
+            if i == 0:
+                self.latent_vector[:, i] = num
+        print (self.latent_vector)
+
+        img = generateImage(1, latent_vector=self.latent_vector)
+        self.panel.configure(image=img)
+        self.panel.image = img
+
+    def updateValue2(self, event):
+        num = self.slider2.get()
+
+        print (self.latent_vector)
+        for i in range(self.latent_vector.shape[-1]):
+            if i == 1:
+                self.latent_vector[:, i] = num
+        print (self.latent_vector)
+
+        img = generateImage(1, latent_vector=self.latent_vector)
+        self.panel.configure(image=img)
+        self.panel.image = img
+
+
 
 def generator_model():
     model = Sequential()
@@ -165,55 +238,23 @@ def generate(BATCH_SIZE, nice=False):
         "generated_image.png")
 
 def realtime(BATCH_SIZE, nice=False):
-    g = generator_model()
-    g.compile(loss='binary_crossentropy', optimizer="SGD")
-    g.load_weights('generator')
-    if nice:
-        d = discriminator_model()
-        d.compile(loss='binary_crossentropy', optimizer="SGD")
-        d.load_weights('discriminator')
-        noise = np.random.uniform(-1, 1, (BATCH_SIZE*20, 100))
-        generated_images = g.predict(noise, verbose=1)
-        d_pret = d.predict(generated_images, verbose=1)
-        index = np.arange(0, BATCH_SIZE*20)
-        index.resize((BATCH_SIZE*20, 1))
-        pre_with_index = list(np.append(d_pret, index, axis=1))
-        pre_with_index.sort(key=lambda x: x[0], reverse=True)
-        nice_images = np.zeros((BATCH_SIZE,) + generated_images.shape[1:3], dtype=np.float32)
-        nice_images = nice_images[:, :, :, None]
-        for i in range(BATCH_SIZE):
-            idx = int(pre_with_index[i][1])
-            nice_images[i, :, :, 0] = generated_images[idx, :, :, 0]
-        image = combine_images(nice_images)
-    else:
-        noise = np.random.uniform(-1, 1, (BATCH_SIZE, 100))
-        generated_images = g.predict(noise, verbose=1)
-        image = combine_images(generated_images)
-    image = image*127.5+127.5
-
-    image = Image.fromarray(np.uint8(image))
-    import tkinter as tk
-    from tkinter import Label
-    class Application(tk.Frame):
-
-        def __init__(self, master=None):
-            tk.Frame.__init__(self, master)
-
-            self.grid()
-
-            self.createWidgets()
-
-        def createWidgets(self):
-            self.quitButton = tk.Button(self, text='Quit', command=self.quit)
-
-            self.quitButton.grid()
 
     app = Application()
+    image = generateImage(1, latent_vector=app.latent_vector)
+    app.panel.configure(image=image)
+    app.panel.image = image
+    app.root.mainloop()
 
-    app.master.title('Real Time Latent Space Viewer')
-    img = ImageTk.PhotoImage(image)
-    panel = Label(app, image=img).grid(row=1, column=1)
-    app.mainloop()
+
+def generateImage(BATCH_SIZE, latent_vector):
+    # noise = np.random.uniform(-1, 1, (BATCH_SIZE*20, 100))
+
+    generated_image = g.predict(latent_vector, verbose=1)
+    image = combine_images(generated_image)
+    image = image * 127.5 + 127.5
+    image = Image.fromarray(image.astype(np.uint8))
+    image = ImageTk.PhotoImage(image)
+    return image
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -226,6 +267,16 @@ def get_args():
 
 EPOCHS = 10
 ONLY_DIGIT_WANTED = 1
+DIM_AMOUNT = 100
+
+g = generator_model()
+g.compile(loss='binary_crossentropy', optimizer="SGD")
+g.load_weights('generator')
+
+d = discriminator_model()
+d.compile(loss='binary_crossentropy', optimizer="SGD")
+d.load_weights('discriminator')
+
 
 if __name__ == "__main__":
     args = get_args()
